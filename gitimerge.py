@@ -3850,6 +3850,22 @@ def cmd_continue(parser, options):
     else:
         sys.stderr.write('Merge is complete!\n')
 
+def cmd_extend(parser, options):
+    git = GitRepository()
+    merge_state = read_merge_state(git, options.name)
+    tip1_old = merge_state.tip1
+    tip2_old = merge_state.tip2
+    merge_base, commits1, commits2 = git.get_boundaries(tip1_old, tip2_old, options.first_parent)
+    # TODO validation of the sequence of commits? it should match the old state
+    # TODO figure out a sensible value for 'source'
+    # NOTE update the merge state with the 'new' commits
+    source = MergeRecord.MANUAL
+    merge_state.get_value(0, 0).record_merge(merge_base, source)
+    for i1, commit in enumerate(commits1, 1):
+        merge_state.get_value(i1, 0).record_merge(commit, source)
+    for i2, commit in enumerate(commits2, 1):
+        merge_state.get_value(0, i2).record_merg(commit, source)
+    merge_state.save()
 
 def cmd_record(parser, options):
     git = GitRepository()
@@ -4179,6 +4195,16 @@ def main(args):
         )
 
     subparser = subparsers.add_parser(
+        'extend',
+        help=(
+            'update an in-progress imerge with the latest commits '
+            'from the two branches'
+            ),
+        )
+    add_name_argument(subparser)
+    add_first_parent_argument(subparser)
+
+    subparser = subparsers.add_parser(
         'finish',
         help=(
             'simplify then remove a completed incremental merge '
@@ -4336,6 +4362,8 @@ def main(args):
         cmd_remove(parser, options)
     elif options.subcommand == 'continue':
         cmd_continue(parser, options)
+    elif options.subcommand == 'extend':
+        cmd_extend(parser, options)
     elif options.subcommand == 'record':
         cmd_record(parser, options)
     elif options.subcommand == 'autofill':
